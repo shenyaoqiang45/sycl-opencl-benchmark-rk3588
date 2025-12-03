@@ -1,4 +1,4 @@
-# SYCL vs OpenCL Performance Benchmark on RK3588
+# SYCL vs OpenCL Performance Benchmark on RK3588  test
 
 This project compares the performance of OpenCL and AdaptiveCpp (SYCL) implementations on RK3588 platform.
 
