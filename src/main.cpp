@@ -4,6 +4,7 @@
 #include <iomanip>
 #include "timer.h"
 #include "image_utils.h"
+#include "cpu_resize.h"
 
 #ifdef USE_OPENCL
 #include "opencl_resize.h"
@@ -46,7 +47,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    std::cout << "=== SYCL vs OpenCL Benchmark on RK3588 ===\n";
+    std::cout << "=== SYCL vs OpenCL vs CPU Benchmark on RK3588 ===\n";
     std::cout << "Input size: " << input_width << "x" << input_height << "\n";
     std::cout << "Output size: " << output_width << "x" << output_height << "\n";
     std::cout << "Iterations: " << iterations << "\n\n";
@@ -58,6 +59,34 @@ int main(int argc, char** argv) {
 
     // Warmup iterations
     const int warmup_iterations = 5;
+
+    // CPU Benchmark
+    std::cout << "Running CPU (OpenMP) benchmark...\n";
+    try {
+        CPUResize cpu_resizer;
+        
+        // Warmup
+        std::cout << "CPU warmup...\n";
+        for (int i = 0; i < warmup_iterations; i++) {
+            cpu_resizer.resize(input_image.data(), output_image.data(),
+                             input_width, input_height,
+                             output_width, output_height);
+        }
+
+        // Benchmark
+        Timer timer;
+        timer.start();
+        for (int i = 0; i < iterations; i++) {
+            cpu_resizer.resize(input_image.data(), output_image.data(),
+                             input_width, input_height,
+                             output_width, output_height);
+        }
+        double cpu_time = timer.stop();
+        print_results("CPU (OpenMP)", cpu_time, iterations);
+
+    } catch (const std::exception& e) {
+        std::cerr << "CPU Error: " << e.what() << "\n";
+    }
 
 #ifdef USE_OPENCL
     std::cout << "Initializing OpenCL...\n";

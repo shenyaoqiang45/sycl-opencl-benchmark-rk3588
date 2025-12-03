@@ -64,7 +64,8 @@ void OpenCLResize::init_opencl() {
     CHECK_CL_ERROR(err, "Failed to create OpenCL context");
 
     // Create command queue
-    m_queue = clCreateCommandQueue(m_context, m_device, 0, &err);
+    // Enable profiling to measure kernel execution time
+    m_queue = clCreateCommandQueue(m_context, m_device, CL_QUEUE_PROFILING_ENABLE, &err);
     CHECK_CL_ERROR(err, "Failed to create command queue");
 
     // Load and compile kernel
@@ -132,10 +133,19 @@ void OpenCLResize::resize(const float* input, float* output,
     size_t global_work_size[2] = {(size_t)output_width, (size_t)output_height};
     size_t local_work_size[2] = {16, 16};
     
+    cl_event event;
     err = clEnqueueNDRangeKernel(m_queue, m_kernel, 2, nullptr,
                                 global_work_size, local_work_size,
-                                0, nullptr, nullptr);
+                                0, nullptr, &event);
     CHECK_CL_ERROR(err, "Failed to execute kernel");
+
+    clWaitForEvents(1, &event);
+    cl_ulong start = 0, end = 0;
+    clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_START, sizeof(cl_ulong), &start, nullptr);
+    clGetEventProfilingInfo(event, CL_PROFILING_COMMAND_END, sizeof(cl_ulong), &end, nullptr);
+    double kernel_time = (double)(end - start) / 1000000.0;
+    std::cout << "Kernel time: " << kernel_time << " ms" << std::endl;
+    clReleaseEvent(event);
 
     // Read results
     err = clEnqueueReadBuffer(m_queue, output_buffer, CL_TRUE, 0,

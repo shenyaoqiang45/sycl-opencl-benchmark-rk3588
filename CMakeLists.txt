@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.16)
 project(SYCL_OpenCL_Benchmark LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -38,6 +38,7 @@ endif()
 set(COMMON_SOURCES
     src/main.cpp
     src/image_utils.cpp
+    src/cpu_resize.cpp
 )
 
 set(OPENCL_SOURCES
@@ -51,8 +52,15 @@ set(SYCL_SOURCES
 # Include directories
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
+# Find OpenMP
+find_package(OpenMP)
+
 # Create executable
 add_executable(benchmark ${COMMON_SOURCES})
+
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(benchmark PRIVATE OpenMP::OpenMP_CXX)
+endif()
 
 # Add OpenCL support
 if(BUILD_OPENCL)
