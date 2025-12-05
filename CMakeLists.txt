@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Options
 option(BUILD_OPENCL "Build OpenCL implementation" ON)
-option(BUILD_SYCL "Build SYCL (AdaptiveCpp) implementation" ON)
+option(BUILD_SYCL "Build SYCL implementation" ON)
 
 # Find OpenCL
 if(BUILD_OPENCL)
@@ -16,20 +16,53 @@ if(BUILD_OPENCL)
     endif()
 endif()
 
-# Find AdaptiveCpp (formerly hipSYCL)
+# Find SYCL implementations
 if(BUILD_SYCL)
-    find_package(AdaptiveCpp CONFIG)
-    if(NOT AdaptiveCpp_FOUND)
-        find_package(hipSYCL CONFIG)
-        if(hipSYCL_FOUND)
-            set(AdaptiveCpp_FOUND TRUE)
+    set(SYCL_IMPL_FOUND FALSE)
+    
+    # Try Intel oneAPI DPC++ (check for IntelSYCL or IntelDPCPP packages)
+    find_package(IntelSYCL QUIET)
+    if(IntelSYCL_FOUND)
+        message(STATUS "Intel SYCL found via IntelSYCL package")
+        set(SYCL_IMPL_FOUND TRUE)
+        set(INTEL_SYCL_FOUND TRUE)
+    endif()
+    
+    # Alternative: try IntelDPCPP package
+    if(NOT SYCL_IMPL_FOUND)
+        find_package(IntelDPCPP QUIET)
+        if(IntelDPCPP_FOUND)
+            message(STATUS "Intel DPC++ found via IntelDPCPP package")
+            set(SYCL_IMPL_FOUND TRUE)
+            set(INTEL_SYCL_FOUND TRUE)
         endif()
     endif()
     
-    if(AdaptiveCpp_FOUND)
-        message(STATUS "AdaptiveCpp/hipSYCL found")
-    else()
-        message(WARNING "AdaptiveCpp not found, SYCL build disabled")
+    # For Intel oneAPI with icx/icpx compiler, SYCL support is built-in
+    if(NOT SYCL_IMPL_FOUND AND CMAKE_CXX_COMPILER_ID MATCHES "IntelLLVM")
+        message(STATUS "Intel DPC++ compiler detected (${CMAKE_CXX_COMPILER_ID}), enabling built-in SYCL support")
+        set(SYCL_IMPL_FOUND TRUE)
+        set(INTEL_SYCL_FOUND TRUE)
+    endif()
+
+    # Try AdaptiveCpp / hipSYCL (used on RK platforms)
+    if(NOT SYCL_IMPL_FOUND)
+        find_package(AdaptiveCpp CONFIG QUIET)
+        if(NOT AdaptiveCpp_FOUND)
+            find_package(hipSYCL CONFIG QUIET)
+            if(hipSYCL_FOUND)
+                set(AdaptiveCpp_FOUND TRUE)
+            endif()
+        endif()
+        
+        if(AdaptiveCpp_FOUND)
+            message(STATUS "AdaptiveCpp/hipSYCL found")
+            set(SYCL_IMPL_FOUND TRUE)
+        endif()
+    endif()
+
+    if(NOT SYCL_IMPL_FOUND)
+        message(WARNING "No SYCL implementation found, SYCL build disabled")
         set(BUILD_SYCL OFF)
     endif()
 endif()
@@ -78,7 +111,17 @@ if(BUILD_SYCL)
     target_sources(benchmark PRIVATE ${SYCL_SOURCES})
     target_compile_definitions(benchmark PRIVATE USE_SYCL)
     
-    if(AdaptiveCpp_FOUND)
+    # Intel DPC++ / oneAPI SYCL
+    if(INTEL_SYCL_FOUND)
+        # With IntelLLVM compiler (icx/icpx), SYCL support is built-in via -fsycl flag
+        target_compile_options(benchmark PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fsycl>)
+        target_link_options(benchmark PRIVATE -fsycl)
+        message(STATUS "Enabled Intel SYCL with -fsycl flag")
+    # Standard SYCL target (if available)
+    elseif(TARGET sycl::sycl)
+        target_link_libraries(benchmark PRIVATE sycl::sycl)
+    # AdaptiveCpp / hipSYCL
+    elseif(AdaptiveCpp_FOUND)
         add_sycl_to_target(TARGET benchmark SOURCES ${SYCL_SOURCES})
     endif()
 endif()
