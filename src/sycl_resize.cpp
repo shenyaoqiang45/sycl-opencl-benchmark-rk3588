@@ -6,16 +6,35 @@
 
 SYCLResize::SYCLResize() {
     try {
-        // Try to create a GPU queue, fall back to default if not available
-        try {
-            m_queue = std::make_unique<sycl::queue>(sycl::gpu_selector_v);
-            std::cout << "Using SYCL device: " 
-                     << m_queue->get_device().get_info<sycl::info::device::name>() << "\n";
-        } catch (...) {
+        // Prefer a GPU device if available. Otherwise fall back to default device.
+        bool device_selected = false;
+
+        auto platforms = sycl::platform::get_platforms();
+        for (const auto &plat : platforms) {
+            auto devices = plat.get_devices();
+            for (const auto &dev : devices) {
+                auto dev_type = dev.get_info<sycl::info::device::device_type>();
+                if (dev_type == sycl::info::device_type::gpu) {
+                    m_queue = std::make_unique<sycl::queue>(dev);
+                    std::cout << "Selected SYCL GPU device: "
+                              << dev.get_info<sycl::info::device::name>() << "\n";
+                    std::cout << "  Platform: " << plat.get_info<sycl::info::platform::name>()
+                              << " (" << plat.get_info<sycl::info::platform::vendor>() << ")\n";
+                    device_selected = true;
+                    break;
+                }
+            }
+            if (device_selected) break;
+        }
+
+        if (!device_selected) {
+            // No GPU found; use default selector
             std::cout << "GPU not available, using default device\n";
             m_queue = std::make_unique<sycl::queue>();
-            std::cout << "Using SYCL device: " 
-                     << m_queue->get_device().get_info<sycl::info::device::name>() << "\n";
+            auto dev = m_queue->get_device();
+            std::cout << "Using SYCL device: " << dev.get_info<sycl::info::device::name>() << "\n";
+            std::cout << "  Platform: " << m_queue->get_context().get_platform().get_info<sycl::info::platform::name>()
+                      << " (" << m_queue->get_context().get_platform().get_info<sycl::info::platform::vendor>() << ")\n";
         }
     } catch (const sycl::exception& e) {
         throw std::runtime_error(std::string("SYCL initialization failed: ") + e.what());

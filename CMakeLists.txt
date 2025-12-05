@@ -116,13 +116,16 @@ if(BUILD_SYCL)
         # With IntelLLVM compiler (icx/icpx), SYCL support is built-in via -fsycl flag
         target_compile_options(benchmark PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-fsycl>)
         target_link_options(benchmark PRIVATE -fsycl)
+        target_compile_definitions(benchmark PRIVATE SYCL_BACKEND_INTEL=1)
         message(STATUS "Enabled Intel SYCL with -fsycl flag")
     # Standard SYCL target (if available)
     elseif(TARGET sycl::sycl)
         target_link_libraries(benchmark PRIVATE sycl::sycl)
+        target_compile_definitions(benchmark PRIVATE SYCL_BACKEND_STD=1)
     # AdaptiveCpp / hipSYCL
     elseif(AdaptiveCpp_FOUND)
         add_sycl_to_target(TARGET benchmark SOURCES ${SYCL_SOURCES})
+        target_compile_definitions(benchmark PRIVATE SYCL_BACKEND_ADAPTIVECPP=1)
     endif()
 endif()
 

@@ -121,7 +121,15 @@ int main(int argc, char** argv) {
 #endif
 
 #ifdef USE_SYCL
+#if defined(SYCL_BACKEND_INTEL)
+    std::cout << "Initializing SYCL (Intel oneAPI / DPC++)...\n";
+#elif defined(SYCL_BACKEND_ADAPTIVECPP)
     std::cout << "Initializing SYCL (AdaptiveCpp)...\n";
+#elif defined(SYCL_BACKEND_STD)
+    std::cout << "Initializing SYCL (standard SYCL CMake package)...\n";
+#else
+    std::cout << "Initializing SYCL...\n";
+#endif
     try {
         SYCLResize sycl_resizer;
         
